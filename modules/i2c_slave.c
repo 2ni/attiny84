@@ -13,6 +13,7 @@
 #include <util/delay.h>
 
 #include "i2c_slave.h"
+#include "mf52.h"
 
 #define SLAVE_ADDR	0x21 // 0x40 does not work?!?
 
@@ -152,13 +153,14 @@ int main(void) {
   }
   */
 
-  uint16_t temperature;
+  int16_t v, temperature;
   startTemp();
 
   // blink LED number of times received from master
   while (1) {
     if (!isAdcBusy()) {
-      temperature = adcGetValue();
+      v = adcGetValue();
+      temperature = getMF52Temp(v);
       startTemp();
     }
 

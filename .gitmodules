@@ -1,3 +1,6 @@
 [submodule "lib/i2c_slave"]
 	path = lib/i2c_slave
 	url = git@github.com:2ni/i2c_slave.git
+[submodule "lib/mf52"]
+	path = lib/mf52
+	url = git@github.com:2ni/mf52.git
