@@ -22,10 +22,15 @@
 #define LED_A	PA0
 #define LED_K	PA1
 #define CHANNEL_THERM   3 // PA3
+#define CHANNEL_MOIST_L 7 // PA7
+#define CHANNEL_MOIST_H 4 // PA5
 
 #define SCL PA4
 #define SDA PA6
 
+#define DATA_ADC_NUM 3
+#define I2C_GET_RAW   0x14
+#define I2C_GET_MOIST 0x13
 #define I2C_SET_BLINK 0x12
 #define I2C_GET_BLINK 0x11
 #define I2C_GET_TEMP  0x10
@@ -58,15 +63,6 @@ inline static void adcSetup() {
   ADCSRA |= _BV(ADIE);
 }
 
-volatile uint8_t adcBusy = 0;
-
-/*
- * isr for adc completed
- */
-ISR(ADC_vect) {
-  adcBusy = 0;
-}
-
 /*
  * 10bit
  * value 512 = 25°C (100kΩ - 100kΩ)
@@ -80,23 +76,41 @@ void adcStart(uint8_t channel) {
 
   // start conversion
   ADCSRA |= _BV(ADSC);
-  adcBusy = 1;
-}
-
-uint8_t isAdcBusy() {
-  return adcBusy;
 }
 
 /*
+ * 0: temp
+ * 1: moist low
+ * 2: moist high
+ */
+volatile static uint16_t data_adc[DATA_ADC_NUM]; // raw data saved from ADC
+volatile static int16_t temperature;
+volatile static int16_t moisture;
+volatile static uint8_t data_index = 0;
+static uint8_t data_channels[3] = {CHANNEL_THERM, CHANNEL_MOIST_L, CHANNEL_MOIST_H};
+
+/*
+ * isr for adc completed
+ * loop trough all ADC to be completed
+ * if raw dat available, calculate human readable values ready to ship
+ *
+ * they must be done beforehand, or i2c might be too slow and loose connection
+ *
  * uint16_t value = ADC; // ADCH, ADCL
  * uint16_t value = ADCL | (ADCH << 8); // ADCH, ADCL
  */
-uint16_t adcGetValue() {
-    return ADC;
-}
+ISR(ADC_vect) {
+  data_adc[data_index] = ADC;
+  if (data_index == 0) {
+    temperature = getMF52Temp(data_adc[data_index]);
+  } else if (data_index == 2) {
+    moisture = 1023 - (data_adc[2] - data_adc[1]);
+  }
 
-void startTemp() {
-    adcStart(CHANNEL_THERM);
+  data_index = (data_index+1) % 3; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
+  adcStart(data_channels[data_index]);
+  //data_adc[0] = ADC;
+  //adcStart(CHANNEL_THERM);
 }
 
 // **************** timer for blinking ******************
@@ -134,7 +148,6 @@ int main(void) {
     _delay_ms(200);
     ledToggle();
   }
-  _delay_ms(2000);
 
   cli();
   timerSetup();
@@ -142,33 +155,27 @@ int main(void) {
   i2cSlaveInit(SLAVE_ADDR);
   sei();
 
-  /*
-  // write data
-  uint8_t count = 0;
+  adcStart(data_channels[data_index]);
+  //TODO wait until all channels updated once
+  //_delay_ms(100);
+
+  // temperature and capacitance (moisture) is constantly updated by ISR
   while (1) {
-    if(!i2cDataInTransmitBuffer()) {
-      i2cTransmitByte(count);
-      ++count;
-    }
-  }
-  */
-
-  int16_t v, temperature;
-  startTemp();
-
-  // blink LED number of times received from master
-  while (1) {
-    if (!isAdcBusy()) {
-      v = adcGetValue();
-      temperature = getMF52Temp(v);
-      startTemp();
-    }
-
     if (i2cDataInReceiveBuffer()) {
       uint8_t in = i2cReceiveByte();
 
-      if (I2C_GET_TEMP == in) {
-        // transmit temperature
+      if (I2C_GET_RAW == in) {
+        for (uint8_t i=0; i<DATA_ADC_NUM; i++) {
+          i2cTransmitByte(data_adc[i] >> 8); // higher byte
+          i2cTransmitByte(data_adc[i] & 0x00ff); // lower byte
+        }
+      } else if (I2C_GET_MOIST == in) {
+        // transmit moisture from raw data
+        i2cTransmitByte(moisture >> 8); // higher byte
+        i2cTransmitByte(moisture & 0x00ff); // lower byte
+
+      } else if (I2C_GET_TEMP == in) {
+        // transmit temperature from existing raw data
         i2cTransmitByte(temperature >> 8); // higher byte
         i2cTransmitByte(temperature & 0x00ff); // lower byte
 

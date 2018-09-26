@@ -13,9 +13,13 @@
 #define SCL 22
 #define ADDR 0x21
 
+#define I2C_GET_RAW   0x14
+#define I2C_GET_MOIST 0x13
 #define I2C_SET_BLINK 0x12
 #define I2C_GET_BLINK 0x11
 #define I2C_GET_TEMP  0x10
+
+#define DATA_ADC_NUM 3
 
 char input[20] = "";
 byte i = 0;
@@ -41,16 +45,23 @@ byte read8(byte addr, byte reg) {
 
 uint16_t read16(byte addr, byte reg) {
   uint16_t value;
-  byte l;
-  byte h;
   readraw(addr, reg, 2);
 
-  h = Wire.read();
-  l = Wire.read();
+  byte in[2]={0};
+  byte c=0;
+  // h first, then l
+  // ignore all except first 2 bytes
+  while(Wire.available()) {
+    byte b = Wire.read();
+    if(c<2) {
+      in[c] = b;
+    }
+    c++;
+  }
 
   Wire.endTransmission();
 
-  value = ((h << 8)&0xff00) | l;
+  value = ((in[0] << 8)&0xff00) | in[1];
   return value;
 }
 
@@ -97,7 +108,7 @@ void setup() {
   pinMode(SDA, INPUT_PULLUP);
   pinMode(SCL, INPUT_PULLUP);
 
-  Wire.setClock(400000);
+  Wire.setClock(200000); // 400kHz might be too much
   Wire.begin(SDA, SCL);
 
   // check if slave is here
@@ -126,8 +137,16 @@ void loop() {
 
   if (Serial.available()) {
     in = (char)Serial.read();
-    if (in == 't') {
-      DF("temp: %u\n", read16(port, I2C_GET_TEMP));
+    if (in == 'r') {
+      // TODO read 3xint16_t in one piece not 3 pieces!
+      // use requestFrom
+      for(byte i=0; i<DATA_ADC_NUM; i++) {
+        DF("raw(%u): %d\n", i, (int16_t)read16(port, I2C_GET_RAW));
+      }
+    } else if (in == 't') {
+      DF("temp: %d\n", (int16_t)read16(port, I2C_GET_TEMP));
+    } else if (in == 'm') {
+      DF("moisture: %u\n", read16(port, I2C_GET_MOIST));
     } else if (in == 'c') {
       if (port) {
         DF("last blink count: %i\n", read8(port, I2C_GET_BLINK));
