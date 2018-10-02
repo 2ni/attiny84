@@ -85,7 +85,7 @@ void adcStart(uint8_t channel) {
  */
 volatile static uint16_t data_adc[DATA_ADC_NUM]; // raw data saved from ADC
 volatile static int16_t temperature;
-volatile static int16_t moisture;
+volatile static uint16_t moisture;
 volatile static uint8_t data_index = 0;
 static uint8_t data_channels[3] = {CHANNEL_THERM, CHANNEL_MOIST_L, CHANNEL_MOIST_H};
 
