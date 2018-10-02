@@ -13,6 +13,7 @@
 #define SCL 22
 #define ADDR 0x21
 
+#define I2C_RESET     0x15
 #define I2C_GET_RAW   0x14
 #define I2C_GET_MOIST 0x13
 #define I2C_SET_BLINK 0x12
@@ -51,9 +52,9 @@ uint16_t read16(byte addr, byte reg) {
   byte c=0;
   // h first, then l
   // ignore all except first 2 bytes
-  while(Wire.available()) {
+  while (Wire.available()) {
     byte b = Wire.read();
-    if(c<2) {
+    if (c<2) {
       in[c] = b;
     }
     c++;
@@ -65,6 +66,23 @@ uint16_t read16(byte addr, byte reg) {
   return value;
 }
 
+/*
+ * Read <size> uint16_t
+ * and save them in values
+ */
+void read16(byte addr, byte reg, uint16_t *values, byte size) {
+  byte c = 0;
+  readraw(addr, reg, 2*size);
+
+  while (Wire.available()) {
+    if (c<size) {
+      values[c] = Wire.read() << 8 | Wire.read();
+    }
+    c++;
+  }
+  Wire.endTransmission();
+}
+
 byte write8(byte addr, byte reg, byte value) {
   byte error;
 
@@ -72,6 +90,16 @@ byte write8(byte addr, byte reg, byte value) {
   Wire.write((uint8_t)reg);
   Wire.write((uint8_t)value);
   error = Wire.endTransmission();
+  return error;
+}
+
+byte write8(byte addr, byte value) {
+  byte error;
+
+  Wire.beginTransmission(addr);
+  Wire.write((uint8_t)value);
+  error = Wire.endTransmission();
+
   return error;
 }
 
@@ -138,10 +166,14 @@ void loop() {
   if (Serial.available()) {
     in = (char)Serial.read();
     if (in == 'r') {
-      // TODO read 3xint16_t in one piece not 3 pieces!
-      // use requestFrom
-      for(byte i=0; i<DATA_ADC_NUM; i++) {
-        DF("raw(%u): %d\n", i, (int16_t)read16(port, I2C_GET_RAW));
+      // reset
+      write8(port, I2C_RESET);
+      DF("resetting...\n");
+    } else if (in == 'd') {
+      uint16_t values[DATA_ADC_NUM] = {0};
+      read16(port, I2C_GET_RAW, values, sizeof(values)/sizeof(values[0]));
+      for (byte i=0; i<DATA_ADC_NUM; i++) {
+        DF("raw(%u): %u\n", i, values[i]);
       }
     } else if (in == 't') {
       DF("temp: %d\n", (int16_t)read16(port, I2C_GET_TEMP));

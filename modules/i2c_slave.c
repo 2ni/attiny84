@@ -10,6 +10,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 #include <util/delay.h>
 
 #include "i2c_slave.h"
@@ -29,6 +30,7 @@
 #define SDA PA6
 
 #define DATA_ADC_NUM 3
+#define I2C_RESET     0x15
 #define I2C_GET_RAW   0x14
 #define I2C_GET_MOIST 0x13
 #define I2C_SET_BLINK 0x12
@@ -85,7 +87,7 @@ void adcStart(uint8_t channel) {
  */
 volatile static uint16_t data_adc[DATA_ADC_NUM]; // raw data saved from ADC
 volatile static int16_t temperature;
-volatile static uint16_t moisture;
+volatile static int16_t moisture;
 volatile static uint8_t data_index = 0;
 static uint8_t data_channels[3] = {CHANNEL_THERM, CHANNEL_MOIST_L, CHANNEL_MOIST_H};
 
@@ -107,11 +109,31 @@ ISR(ADC_vect) {
     moisture = 1023 - (data_adc[2] - data_adc[1]);
   }
 
-  data_index = (data_index+1) % 3; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
+  data_index = (data_index+1) % DATA_ADC_NUM; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
   adcStart(data_channels[data_index]);
   //data_adc[0] = ADC;
   //adcStart(CHANNEL_THERM);
 }
+
+// **************** watchdog ******************
+
+/*
+ * Turn off watchdog
+ * based on ATtiny84 datasheet p.44
+ */
+void wdtOff() {
+  wdt_reset();
+  MCUSR = 0x00; // clear WDRF in MCUSR
+  WDTCSR |= _BV(WDCE) | _BV(WDE); // write logical one to WDCE, WDE
+  WDTCSR = 0x00; // turn off wdt
+}
+
+void wdtOn() {
+  WDTCSR = _BV(WDE); // timeout at 16ms
+}
+
+#define reset() wdtOn(); while(1) {}
+
 
 // **************** timer for blinking ******************
 void timerSetup() {
@@ -141,6 +163,7 @@ ISR(TIM1_COMPA_vect) {
 }
 
 int main(void) {
+  wdtOff();
   ledSetup();
 
   // simple blink on startup
@@ -164,7 +187,9 @@ int main(void) {
     if (i2cDataInReceiveBuffer()) {
       uint8_t in = i2cReceiveByte();
 
-      if (I2C_GET_RAW == in) {
+      if (I2C_RESET == in) {
+        reset();
+      } else if (I2C_GET_RAW == in) {
         for (uint8_t i=0; i<DATA_ADC_NUM; i++) {
           i2cTransmitByte(data_adc[i] >> 8); // higher byte
           i2cTransmitByte(data_adc[i] & 0x00ff); // lower byte
