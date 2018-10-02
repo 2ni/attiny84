@@ -24,7 +24,7 @@
 #define LED_K	PA1
 #define CHANNEL_THERM   3 // PA3
 #define CHANNEL_MOIST_L 7 // PA7
-#define CHANNEL_MOIST_H 4 // PA5
+#define CHANNEL_MOIST_H 5 // PA5
 
 #define SCL PA4
 #define SDA PA6
