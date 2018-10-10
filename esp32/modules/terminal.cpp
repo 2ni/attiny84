@@ -2,12 +2,11 @@
  * Simple terminal reply prompt
  */
 
+#include "base.h"
+#include "mqtt.h"
+
 #include <Arduino.h>
 #include <Wire.h>
-
-#define D(x) Serial.print(x)
-#define DL(x) Serial.println(x)
-#define DF(...) Serial.printf(__VA_ARGS__);
 
 #define SDA 21
 #define SCL 22
@@ -21,6 +20,14 @@
 #define I2C_GET_TEMP  0x10
 
 #define DATA_ADC_NUM 3
+
+unsigned long start;
+
+MQTT mqtt;
+
+/*
+ * I2C functions
+ */
 
 char input[20] = "";
 byte i = 0;
@@ -124,6 +131,35 @@ byte scan_ports() {
   return 0;
 }
 
+void send_data() {
+  char msg[50] = "";
+  memset(msg, 0, sizeof(msg)); // really clear all data
+  int16_t t = (int16_t)read16(port, I2C_GET_TEMP);
+  uint16_t m = read16(port, I2C_GET_MOIST);
+
+  char ct[10];
+  dtostrf((float)t/10, 0, 1, ct);
+
+  sprintf(msg, "measure\thum=%u,temp=%s", m, ct);
+  //DF("msg: %s\n", msg);
+  mqtt.send_to_mqtt(msg);
+  start = millis();
+}
+
+void show_help() {
+  DL("***********************************");
+  DL("h - help");
+  DL("s - send data to mqtt");
+  DL("r - reset sensor");
+  DL("d - display raw data from sensor");
+  DL("t - show temperature from sensor");
+  DL("m - show moisture from sensor");
+  DL("c - show last blink count");
+  DL("[0-9]+<enter> - blink LED on sensor");
+  DL("***********************************");
+  DL();
+}
+
 void setup() {
   // uart
   Serial.begin(115200);
@@ -131,6 +167,7 @@ void setup() {
   while (!Serial) { }
 
   DL("Hello from outer space!");
+  show_help();
   DL("Enter number of desired eye blinking...");
 
   pinMode(SDA, INPUT_PULLUP);
@@ -151,10 +188,21 @@ void setup() {
     DL("Outsch. Slave not found!");
     no_port = 1;
   }
+
+  start = millis();
+  //send_data();
 }
 
 void loop() {
   char in;
+
+  mqtt.client.loop();
+
+  // deep sleep after 5min inactivity
+  // send data for now
+  if (millis() - start > 15*60000) {
+    send_data();
+  }
 
   if (no_port && (millis() % 2000 == 0)) {
     port = scan_ports();
@@ -165,7 +213,12 @@ void loop() {
 
   if (Serial.available()) {
     in = (char)Serial.read();
-    if (in == 'r') {
+    //start = millis();
+    if (in == 'h') {
+      show_help();
+    } else if (in == 's') {
+      send_data();
+    } else if (in == 'r') {
       // reset
       write8(port, I2C_RESET);
       DF("resetting...\n");
@@ -208,5 +261,4 @@ void loop() {
     }
   }
 }
-
 
