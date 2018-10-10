@@ -16,9 +16,6 @@ MQTT::MQTT() {
   PubSubClient client(wifiClient);
 }
 
-/*
- * TODO finds service at 192.168.1.250 instead of .7!
- */
 Ipport MQTT::mqtt_findservice() {
   Ipport ipport;
   int trials=0;
