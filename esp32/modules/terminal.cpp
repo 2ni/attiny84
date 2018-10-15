@@ -21,7 +21,7 @@
 
 #define DATA_ADC_NUM 3
 
-unsigned long start;
+unsigned long last_sent_data;
 
 MQTT mqtt;
 
@@ -140,10 +140,11 @@ void send_data() {
   char ct[10];
   dtostrf((float)t/10, 0, 1, ct);
 
+  DF("Sending data to mqtt broker\n");
   sprintf(msg, "measure\thum=%u,temp=%s", m, ct);
   //DF("msg: %s\n", msg);
   mqtt.send_to_mqtt(msg);
-  start = millis();
+  last_sent_data = millis();
 }
 
 void show_help() {
@@ -189,18 +190,18 @@ void setup() {
     no_port = 1;
   }
 
-  start = millis();
-  //send_data();
+  last_sent_data = millis();
+  send_data();
 }
 
 void loop() {
   char in;
 
-  mqtt.client.loop();
+  mqtt.loop();
 
-  // deep sleep after 5min inactivity
+  // deep sleep after 15min inactivity
   // send data for now
-  if (millis() - start > 15*60000) {
+  if (millis() - last_sent_data > (15*60000)) {
     send_data();
   }
 
@@ -213,7 +214,7 @@ void loop() {
 
   if (Serial.available()) {
     in = (char)Serial.read();
-    //start = millis();
+    //last_sent_data = millis();
     if (in == 'h') {
       show_help();
     } else if (in == 's') {

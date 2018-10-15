@@ -21,12 +21,12 @@ class MQTT {
 
   public:
     char nodename[20];
-    PubSubClient client;
     WIFI wifi;
 
     MQTT(char* nodename);
     MQTT();
     void send_to_mqtt(char* msg);
+    void loop();
     static void callback(char* topic, byte* payload, unsigned int length);
 };
 

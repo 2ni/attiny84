@@ -8,12 +8,16 @@
 #include <ESPmDNS.h>
 
 
+WiFiClient pswc;
+PubSubClient psclient(pswc);
+
 MQTT::MQTT() {
   WIFI wifi;
   strcpy(nodename, wifi.nodename);
+}
 
-  WiFiClient wifiClient;
-  PubSubClient client(wifiClient);
+void MQTT::loop() {
+  psclient.loop();
 }
 
 Ipport MQTT::mqtt_findservice() {
@@ -65,32 +69,30 @@ void MQTT::keepalive() {
     connection_watchdog = millis();
     DF("Establishing wifi connection\n");
     init_wifi();
-  } else if ((millis() - connection_watchdog) > 12000) && (WiFi.status() == WL_CONNECTED && (!client.connected())) {
+  } else if ((millis() - connection_watchdog) > 12000) && (WiFi.status() == WL_CONNECTED && (!psclient.connected())) {
     DF("Establishing mqtt connection\n");
     mqtt_reconnect();
   }
-  client.loop();
+  psclient.loop();
   delay(1);
 }
 */
 
 /*
- * needs client.loop() in loop() function
+ * needs psclient.loop() in loop() function
  */
 void MQTT::mqtt_reconnect() {
   //connect to wifi if not connected
-  if (WiFi.status() != WL_CONNECTED)  {
-    wifi.connect();
-  }
+  wifi.connect();
 
   // connect to mqtt broker if not connected
-  if (!client.connected()) {
+  if (!psclient.connected()) {
     DF("Establishing MQTT with id %s, ", nodename);
 
     Ipport ipport = mqtt_findservice();
 
-    client.setServer(ipport.ip, ipport.port); // 8883 for SSL
-    //client.setCallback(callback);
+    psclient.setServer(ipport.ip, ipport.port); // 8883 for SSL
+    psclient.setCallback(callback);
 
     // if no static callback -> these options do not work (yet)
     /*
@@ -98,14 +100,14 @@ void MQTT::mqtt_reconnect() {
     std::function<void(char*, unsigned char*, unsigned int)> yourFunction = [=](char* topic, unsigned char* payload, unsigned int length) {
       this->mqtt_callback(topic, payload, length);
     };
-    client.setCallback(yourFunction);
+    psclient.setCallback(yourFunction);
 
-    client.setCallback(std::bind(&MQTT::mqtt_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-    client.setCallback([this](char *t, byte *p, unsigned int l) { mqtt_callback(t, p, l); });
+    psclient.setCallback(std::bind(&MQTT::mqtt_callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    psclient.setCallback([this](char *t, byte *p, unsigned int l) { mqtt_callback(t, p, l); });
 
     https://github.com/HobbytronicsPK/ESPMetRED
     https://hobbytronics.pk/arduino-custom-library-and-pubsubclient-call-back/
-    client.setCallback([this] (char* topic, byte* payload, unsigned int length) { this->callback(topic, payload, length); });
+    psclient.setCallback([this] (char* topic, byte* payload, unsigned int length) { this->callback(topic, payload, length); });
     */
 
     const byte maxPoll = 2;
@@ -113,13 +115,13 @@ void MQTT::mqtt_reconnect() {
     for (byte i=0; i<maxPoll; i++) {
       // boolean connect (clientID, willTopic, willQoS, willRetain, willMessage)
       // nodename, sensorPOC, 1, true, "went offline"
-      client.connect(nodename);
+      psclient.connect(nodename);
       DF("connecting to mqtt as nodename %s\n", nodename);
       D(".");
-      if (client.connected()) {
+      if (psclient.connected()) {
         connected = 1;
         DL("connected");
-        if (!client.subscribe(MQTT_TOPIC_IN)) {
+        if (!psclient.subscribe(MQTT_TOPIC_IN)) {
           DL("mqtt subscription callback failed");
         }
         break;
@@ -128,7 +130,7 @@ void MQTT::mqtt_reconnect() {
 
     if (!connected) {
       D("failed, rc=");
-      DL(client.state());
+      DL(psclient.state());
     }
   }
 }
@@ -140,5 +142,5 @@ void MQTT::send_to_mqtt(char* msg) {
   char msg_mqtt[100] = "";
   sprintf(msg_mqtt, "%s\t%s", nodename, msg);
 
-  client.publish(MQTT_TOPIC, msg_mqtt);
+  psclient.publish(MQTT_TOPIC, msg_mqtt);
 }
