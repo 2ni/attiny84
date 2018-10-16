@@ -20,8 +20,9 @@
 #define I2C_GET_TEMP  0x10
 
 #define DATA_ADC_NUM 3
+#define SHIPPING_INTERVALL 5*60000 // 5min
 
-unsigned long last_sent_data;
+unsigned long next_shipping;
 
 MQTT mqtt;
 
@@ -132,6 +133,8 @@ byte scan_ports() {
 }
 
 void send_data() {
+  if (no_port) return;
+
   char msg[50] = "";
   memset(msg, 0, sizeof(msg)); // really clear all data
   int16_t t = (int16_t)read16(port, I2C_GET_TEMP);
@@ -140,11 +143,11 @@ void send_data() {
   char ct[10];
   dtostrf((float)t/10, 0, 1, ct);
 
-  DF("Sending data to mqtt broker\n");
   sprintf(msg, "measure\thum=%u,temp=%s", m, ct);
   //DF("msg: %s\n", msg);
   mqtt.send_to_mqtt(msg);
-  last_sent_data = millis();
+  next_shipping = millis()+SHIPPING_INTERVALL;
+  write8(port, I2C_SET_BLINK, 1); // blink
 }
 
 void show_help() {
@@ -190,7 +193,7 @@ void setup() {
     no_port = 1;
   }
 
-  last_sent_data = millis();
+  next_shipping = 0;
   send_data();
 }
 
@@ -199,22 +202,23 @@ void loop() {
 
   mqtt.loop();
 
-  // deep sleep after 15min inactivity
+  // deep sleep after 5min inactivity
   // send data for now
-  if (millis() - last_sent_data > (15*60000)) {
+  if (millis() > next_shipping) {
     send_data();
   }
 
   if (no_port && (millis() % 2000 == 0)) {
     port = scan_ports();
     if (port) {
+      next_shipping = 0; // send now
       no_port = 0;
     }
   }
 
   if (Serial.available()) {
     in = (char)Serial.read();
-    //last_sent_data = millis();
+    //next_shipping = millis()+SHIPPING_INTERVALL;
     if (in == 'h') {
       show_help();
     } else if (in == 's') {

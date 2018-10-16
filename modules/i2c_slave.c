@@ -16,7 +16,7 @@
 #include "i2c_slave.h"
 #include "mf52.h"
 
-#define SLAVE_ADDR	0x21 // 0x40 does not work?!?
+#define SLAVE_ADDR	0x21 // above 0x40 does not work?!?
 
 #define DDR		DDRA
 #define PORT	PORTA
