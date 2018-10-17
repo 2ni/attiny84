@@ -29,7 +29,8 @@
 #define SCL PA4
 #define SDA PA6
 
-#define DATA_ADC_NUM 3
+#define DATA_ADC_NUM 7
+
 #define I2C_RESET     0x15
 #define I2C_GET_RAW   0x14
 #define I2C_GET_MOIST 0x13
@@ -82,14 +83,19 @@ void adcStart(uint8_t channel) {
 
 /*
  * 0: temp
- * 1: moist low
- * 2: moist high
+ * 1: moist low 0
+ * 2: moist high 0
+ * 3: moist low 1
+ * 4: moist high 1
+ * 5: moist low 2
+ * 6: moist high 2
  */
-volatile static uint16_t data_adc[DATA_ADC_NUM]; // raw data saved from ADC
-volatile static int16_t temperature;
-volatile static int16_t moisture;
+volatile static uint16_t data_adc[DATA_ADC_NUM] = {0}; // raw data saved from ADC
+volatile static int16_t temperature = 0;
+volatile static int16_t moisture = 0;
 volatile static uint8_t data_index = 0;
-static uint8_t data_channels[3] = {CHANNEL_THERM, CHANNEL_MOIST_L, CHANNEL_MOIST_H};
+volatile static uint8_t next_channel = 0;
+static uint8_t data_channels[3] = {CHANNEL_MOIST_L, CHANNEL_MOIST_H, CHANNEL_THERM};
 
 /*
  * isr for adc completed
@@ -100,17 +106,46 @@ static uint8_t data_channels[3] = {CHANNEL_THERM, CHANNEL_MOIST_L, CHANNEL_MOIST
  *
  * uint16_t value = ADC; // ADCH, ADCL
  * uint16_t value = ADCL | (ADCH << 8); // ADCH, ADCL
+ *
+ * get average of 3 moisture values
+ *
+ * 0: moist_sum_l
+ * 1: moist_sum_h
+ * 2: moist_sum_l
+ * 3: moist_sum_h
+ * 4: moist_sum_l
+ * 5: moist_sum_h
+ * 6: temp
  */
 ISR(ADC_vect) {
   data_adc[data_index] = ADC;
+  data_index = (data_index+1) % DATA_ADC_NUM; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
+
+  // whole measurement cycle done -> calculate temperature and moisture from raw values
   if (data_index == 0) {
-    temperature = getMF52Temp(data_adc[data_index]);
-  } else if (data_index == 2) {
-    moisture = 1023 - (data_adc[2] - data_adc[1]);
+    uint16_t sum_l = 0;
+    uint16_t sum_h = 0;
+    uint16_t count = (DATA_ADC_NUM-1)/2;
+    for (uint8_t i=0; i<(DATA_ADC_NUM-1); i++) {
+      if (i%2) {
+        // odd sum_h
+        sum_h += data_adc[i];
+      } else {
+        // even sum_l
+        sum_l += data_adc[i];
+      }
+    }
+    moisture = 1023 - (sum_h - sum_l)/count;
+    temperature = getMF52Temp(data_adc[DATA_ADC_NUM-1]);
   }
 
-  data_index = (data_index+1) % DATA_ADC_NUM; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
-  adcStart(data_channels[data_index]);
+  // if last measurement -> temperature
+  uint8_t next_channel = data_index % 2;
+  if (data_index == (DATA_ADC_NUM-1)) {
+    next_channel = 2;
+  }
+
+  adcStart(data_channels[next_channel]);
   //data_adc[0] = ADC;
   //adcStart(CHANNEL_THERM);
 }
@@ -178,7 +213,7 @@ int main(void) {
   i2cSlaveInit(SLAVE_ADDR);
   sei();
 
-  adcStart(data_channels[data_index]);
+  adcStart(data_channels[0]);
   //TODO wait until all channels updated once
   //_delay_ms(100);
 

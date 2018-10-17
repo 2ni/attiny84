@@ -19,7 +19,7 @@
 #define I2C_GET_BLINK 0x11
 #define I2C_GET_TEMP  0x10
 
-#define DATA_ADC_NUM 3
+#define DATA_ADC_NUM 7
 #define SHIPPING_INTERVALL 5*60000 // 5min
 
 unsigned long next_shipping;
