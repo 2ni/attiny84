@@ -16,6 +16,8 @@
 #include "i2c_slave.h"
 #include "mf52.h"
 
+#include "uart.h"
+
 #define SLAVE_ADDR	0x21 // above 0x40 does not work?!?
 
 #define DDR		DDRA
@@ -200,6 +202,9 @@ ISR(TIM1_COMPA_vect) {
 int main(void) {
   wdtOff();
   ledSetup();
+
+  //DINIT();
+  //DL("hello from ATtiny84.");
 
   // simple blink on startup
   for (int i=0; i<6; i++) {

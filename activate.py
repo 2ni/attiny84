@@ -8,7 +8,6 @@ https://stackoverflow.com/questions/23766689/python-argparse-arg-with-no-flag
 '''
 
 import os, re, argparse
-from serial.tools import list_ports
 
 parser = argparse.ArgumentParser(description='Activate given files', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('files', metavar='file', type=argparse.FileType('r'), nargs='*', help='Files to activate')

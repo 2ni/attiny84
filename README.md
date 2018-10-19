@@ -35,6 +35,21 @@ pullup in	0	1
 out		1	0/1
 ```
 
+# Debugging
+- using http://www.justgeek.de/a-simple-simplex-uart-for-debugging-avrs/
+```
+make debug
+screen -L /dev/cu.usbserial-AH06TDUZ
+
+This is not working:
+- download https://tinusaur.org/2015/03/07/the-owowod-library/ to lib
+- only debugging.h, owowod.*, serout.h is needed
+- get num2str.* from https://bitbucket.org/tinusaur/tinyavrlib/src/default/ and copy it to owowod/
+- adapt include in owowod.h to #include "num2str.h"
+
+- screen -L /dev.cu.usbserial-xxx
+- quit: ctrl-a ctrl-$
+
 # Background information
 - https://wemakethings.net/2012/09/26/capacitance_measurement/
 - https://wemakethings.net/chirp/
