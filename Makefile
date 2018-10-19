@@ -16,4 +16,4 @@ fuse:
 debug:
 	@echo "quit with: ctrl-a; ctrl-$$ "
 	@sleep 1
-	@screen -L /dev/cu.usbserial-AH06TDUZ
+	@screen /dev/cu.usbserial-AH06TDUZ
