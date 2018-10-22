@@ -37,9 +37,11 @@ out		1	0/1
 
 # Debugging
 - using http://www.justgeek.de/a-simple-simplex-uart-for-debugging-avrs/
+- connect uart to ATtiny: GND-GND, RXD-PA2
 ```
 make debug
 screen -L /dev/cu.usbserial-AH06TDUZ
+```
 
 This is not working:
 - download https://tinusaur.org/2015/03/07/the-owowod-library/ to lib
