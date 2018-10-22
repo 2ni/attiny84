@@ -31,7 +31,8 @@
 #define SCL PA4
 #define SDA PA6
 
-#define DATA_ADC_NUM 7
+#define HUM_SETS 3
+#define DATA_ADC_NUM (HUM_SETS*2+1)
 
 #define I2C_RESET     0x15
 #define I2C_GET_RAW   0x14
@@ -121,13 +122,12 @@ static uint8_t data_channels[3] = {CHANNEL_MOIST_L, CHANNEL_MOIST_H, CHANNEL_THE
  */
 ISR(ADC_vect) {
   data_adc[data_index] = ADC;
-  data_index = (data_index+1) % DATA_ADC_NUM; // alternative w/o division: x = (x + 1 == n ? 0: x + 1);
+  data_index = ((data_index+1) == DATA_ADC_NUM ? 0 : data_index+1); // avoid divisions with %
 
   // whole measurement cycle done -> calculate temperature and moisture from raw values
   if (data_index == 0) {
     uint16_t sum_l = 0;
     uint16_t sum_h = 0;
-    uint16_t count = (DATA_ADC_NUM-1)/2;
     for (uint8_t i=0; i<(DATA_ADC_NUM-1); i++) {
       if (i%2) {
         // odd sum_h
@@ -137,7 +137,7 @@ ISR(ADC_vect) {
         sum_l += data_adc[i];
       }
     }
-    moisture = 1023 - (sum_h - sum_l)/count;
+    moisture = 1023 - (sum_h - sum_l)/HUM_SETS;
     temperature = getMF52Temp(data_adc[DATA_ADC_NUM-1]);
   }
 
@@ -203,8 +203,8 @@ int main(void) {
   wdtOff();
   ledSetup();
 
-  //DINIT();
-  //DL("hello from ATtiny84.");
+  DINIT();
+  DL("hello from ATtiny84.");
 
   // simple blink on startup
   for (int i=0; i<6; i++) {
