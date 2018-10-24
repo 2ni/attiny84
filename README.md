@@ -17,12 +17,15 @@ pio run -t program
 ```
 
 # Fuses
+http://www.engbedded.com/fusecalc/
+1 means no checkbox
+
 ```
-CKDIV8    : 0 (no division)
+CKDIV8    : 1 (no division)
 CKOUT     : 0 (clk on portb2)
+SUT[1:0]  : 11 (ceramic resonator, fast rising power)
 CKSEL[3:1]: 110 (3-8Mhz)
 CKSEL0    : 0
-SUT[1:0]  : 11 (ceramic resonator, fast rising power)
 L: 0xBC, H: 0xDF, E: 0xFF -> avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xbc:m
 (Defaults L: 0x62, H: 0xDF, E: 0xFF)
 ```

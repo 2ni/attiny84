@@ -10,8 +10,13 @@ flash:
 check:
 	avrdude -c usbasp -p t84 -P usb -v
 
-fuse:
+# No div8, clk to portb2, ceramic resonatr fast rising, 3-8MHz
+fuseckout:
 	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xbc:m
+
+# No div8, ceramic resonatr fast rising, 3-8MHz
+fuse:
+	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xfc:m
 
 debug:
 	@echo "quit with: ctrl-a; ctrl-$$ "
