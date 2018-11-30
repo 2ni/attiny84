@@ -237,7 +237,11 @@ void loop() {
     } else if (in == 't') {
       DF("temp: %d\n", (int16_t)read16(port, I2C_GET_TEMP));
     } else if (in == 'm') {
-      DF("moisture: %u\n", read16(port, I2C_GET_MOIST));
+      uint16_t m = read16(port, I2C_GET_MOIST);
+      char cm[10];
+      dtostrf((float)(m-325)*100/(615-325), 0, 1, cm); // convert in % humidity 0-100
+
+      DF("moisture: %u (%s)\n", m, cm)
     } else if (in == 'c') {
       if (port) {
         DF("last blink count: %i\n", read8(port, I2C_GET_BLINK));
