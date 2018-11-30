@@ -8,6 +8,8 @@
 #include "creds.h"
 #include "base.h"
 
+#include "wifi.h"
+
 WIFI::WIFI() {
   WiFiMulti wifiMulti;
 
