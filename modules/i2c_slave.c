@@ -34,12 +34,13 @@
 #define HUM_SETS 3
 #define DATA_ADC_NUM (HUM_SETS*2+1)
 
-#define I2C_RESET     0x15
-#define I2C_GET_RAW   0x14
-#define I2C_GET_MOIST 0x13
-#define I2C_SET_BLINK 0x12
-#define I2C_GET_BLINK 0x11
-#define I2C_GET_TEMP  0x10
+#define I2C_GET_MOISTRAW 0x16
+#define I2C_RESET        0x15
+#define I2C_GET_RAW      0x14
+#define I2C_GET_MOIST    0x13
+#define I2C_SET_BLINK    0x12
+#define I2C_GET_BLINK    0x11
+#define I2C_GET_TEMP     0x10
 
 #define MOIST_MIN 325
 #define MOIST_MAX 615
@@ -176,9 +177,10 @@ void adcStart(uint8_t channel) {
  * 3: moist_sum_h
  * 4: moist_sum_l
  * 5: moist_sum_h
- * 6: temp
+ * 7: temp
  */
 ISR(ADC_vect) {
+  cli();
   data_adc[data_index] = ADC;
   data_index = ((data_index+1) == DATA_ADC_NUM ? 0 : data_index+1); // avoid divisions with %
 
@@ -201,10 +203,10 @@ ISR(ADC_vect) {
     } else if (moisture > MOIST_MAX) {
         moisture_percent = 1000;
     } else {
-	uint16_t range = MOIST_MAX - MOIST_MIN;
+        uint16_t range = MOIST_MAX - MOIST_MIN;
         moisture_percent = (moisture - MOIST_MIN);
-	moisture_percent *= 1000;
-	moisture_percent /= range;
+        moisture_percent *= 1000;
+        moisture_percent /= range;
     }
     temperature = getMF52Temp(data_adc[DATA_ADC_NUM-1]);
   }
@@ -223,6 +225,7 @@ ISR(ADC_vect) {
     // even - start measurement in some time
     measureTimerStart();
   }
+  sei();
 }
 
 /*
@@ -307,7 +310,9 @@ int main(void) {
         // transmit moisture from raw data
         i2cTransmitByte(moisture_percent >> 8); // higher byte
         i2cTransmitByte(moisture_percent & 0x00ff); // lower byte
-
+      } else if (I2C_GET_MOISTRAW == in) {
+        i2cTransmitByte(moisture >> 8); // higher byte
+        i2cTransmitByte(moisture & 0x00ff); // lower byte
       } else if (I2C_GET_TEMP == in) {
         // transmit temperature from existing raw data
         i2cTransmitByte(temperature >> 8); // higher byte

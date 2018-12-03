@@ -12,12 +12,13 @@
 #define SCL 22
 #define ADDR 0x21
 
-#define I2C_RESET     0x15
-#define I2C_GET_RAW   0x14
-#define I2C_GET_MOIST 0x13
-#define I2C_SET_BLINK 0x12
-#define I2C_GET_BLINK 0x11
-#define I2C_GET_TEMP  0x10
+#define I2C_GET_MOISTRAW 0x16
+#define I2C_RESET        0x15
+#define I2C_GET_RAW      0x14
+#define I2C_GET_MOIST    0x13
+#define I2C_SET_BLINK    0x12
+#define I2C_GET_BLINK    0x11
+#define I2C_GET_TEMP     0x10
 
 #define HUM_SETS 3
 #define DATA_ADC_NUM (HUM_SETS*2+1)
@@ -141,10 +142,11 @@ void send_data() {
   int16_t t = (int16_t)read16(port, I2C_GET_TEMP);
   uint16_t m = read16(port, I2C_GET_MOIST);
 
-  char ct[10];
+  char ct[10], cm[10];
   dtostrf((float)t/10, 0, 1, ct);
+  dtostrf((float)m/10, 0, 1, cm);
 
-  sprintf(msg, "measure\thum=%u,temp=%s", m, ct);
+  sprintf(msg, "measure\thum=%s,temp=%s", cm, ct);
   //DF("msg: %s\n", msg);
   mqtt.send_to_mqtt(msg);
   next_shipping = millis()+SHIPPING_INTERVALL;
@@ -159,6 +161,7 @@ void show_help() {
   DL("d - display raw data from sensor");
   DL("t - show temperature from sensor");
   DL("m - show moisture from sensor");
+  DL("n - show raw moisture from sensor");
   DL("c - show last blink count");
   DL("[0-9]+<enter> - blink LED on sensor");
   DL("***********************************");
@@ -242,6 +245,10 @@ void loop() {
       dtostrf((float)m/10, 0, 1, cm); // convert in % humidity 0-100 (given 0-1000)
 
       DF("moisture: %s%%\n", cm)
+    } else if (in == 'n') {
+      uint16_t m = read16(port, I2C_GET_MOISTRAW);
+
+      DF("moisture: %u\n", m)
     } else if (in == 'c') {
       if (port) {
         DF("last blink count: %i\n", read8(port, I2C_GET_BLINK));
