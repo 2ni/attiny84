@@ -203,10 +203,8 @@ ISR(ADC_vect) {
     } else if (moisture > MOIST_MAX) {
         moisture_percent = 1000;
     } else {
-        uint16_t range = MOIST_MAX - MOIST_MIN;
-        moisture_percent = (moisture - MOIST_MIN);
-        moisture_percent *= 1000;
-        moisture_percent /= range;
+        moisture_percent = (moisture - MOIST_MIN)*100/(MOIST_MAX - MOIST_MIN); // ensure never > 2^16 (*1000 = *100 *10), 0.1% precision
+        moisture_percent *= 10;
     }
     temperature = getMF52Temp(data_adc[DATA_ADC_NUM-1]);
   }
