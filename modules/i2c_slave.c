@@ -41,6 +41,9 @@
 #define I2C_GET_BLINK 0x11
 #define I2C_GET_TEMP  0x10
 
+#define MOIST_MIN 325
+#define MOIST_MAX 615
+
 inline static void ledSetup(){
   DDR |= _BV(LED_A) | _BV(LED_K); // enable as output (set 1)
   PORT &= ~_BV(LED_A); // set low
@@ -58,6 +61,77 @@ inline static void ledOff() {
 inline static void ledToggle() {
   PORT ^= _BV(LED_A); // invert (exclusive or)
 }
+
+/*
+ * 0: temp
+ * 1: moist low 0
+ * 2: moist high 0
+ * 3: moist low 1
+ * 4: moist high 1
+ * 5: moist low 2
+ * 6: moist high 2
+ */
+volatile static uint16_t data_adc[DATA_ADC_NUM] = {0}; // raw data saved from ADC
+volatile static int16_t temperature = 0;
+volatile static int16_t moisture = 0;
+volatile static int16_t moisture_percent = 0;
+volatile static uint8_t data_index = 0;
+volatile static uint8_t next_channel = 0;
+static uint8_t data_channels[3] = {CHANNEL_MOIST_L, CHANNEL_MOIST_H, CHANNEL_THERM};
+
+uint8_t blink_count = 0;
+uint8_t blink_last_count = 0;
+
+// **************** timer for blinking ******************
+
+/*
+ * prescaler 64
+ * 1 cycle = 64/4M = 16us (resolution)
+ *
+ * 1ms   = 62.5
+ * 250ms = 15625
+ *
+ * Timer0: 8-bit,  max: 4.08ms
+ * Timer1: 16-bit, max: 1.05s
+ * -----------------------------
+ * prescaler 1024
+ * 1 cycle = 1024/4M = 256us (resolution)
+ *
+ * 1ms   = 3.90625
+ * 250ms = 976.5625
+ *
+ * Timer0: 8-bit,  max: 65.28ms
+ * Timer1: 16-bit, max: 16.77s
+ *
+ */
+void timerSetup() {
+  // Timer 1
+  TCCR1B |= _BV(CS12) | _BV(CS10); // divide by 1024
+  OCR1A = 976; // ~250ms
+  TCCR1B |= _BV(WGM12); // counter1 in CTC mode (Clear Timer on Compare)
+
+  // Timer 0
+  TCCR0B |= _BV(CS02) | _BV(CS00); // divide by 1024
+  OCR0A = 195; // ~50ms
+  TCCR0A |= _BV(WGM01); // counter0 in CTC mode
+}
+
+void blinkTimerStart() {
+  TIMSK1 |= _BV(OCIE1A); //enable timer compare interrupt
+}
+
+void blinkTimerStop() {
+  TIMSK1 &= ~_BV(OCIE1A); //disable timer compare interrupt
+}
+
+void measureTimerStart() {
+  TIMSK0 |= _BV(OCIE0A); // enable timer compare interrupt
+}
+
+void measureTimerStop() {
+  TIMSK0 &= ~_BV(OCIE0A); // disable timer compare interrupt
+}
+
 
 // **************** ADC ******************
 
@@ -83,22 +157,6 @@ void adcStart(uint8_t channel) {
   // start conversion
   ADCSRA |= _BV(ADSC);
 }
-
-/*
- * 0: temp
- * 1: moist low 0
- * 2: moist high 0
- * 3: moist low 1
- * 4: moist high 1
- * 5: moist low 2
- * 6: moist high 2
- */
-volatile static uint16_t data_adc[DATA_ADC_NUM] = {0}; // raw data saved from ADC
-volatile static int16_t temperature = 0;
-volatile static int16_t moisture = 0;
-volatile static uint8_t data_index = 0;
-volatile static uint8_t next_channel = 0;
-static uint8_t data_channels[3] = {CHANNEL_MOIST_L, CHANNEL_MOIST_H, CHANNEL_THERM};
 
 /*
  * isr for adc completed
@@ -138,18 +196,53 @@ ISR(ADC_vect) {
       }
     }
     moisture = 1023 - (sum_h - sum_l)/HUM_SETS;
+    if (moisture < MOIST_MIN) {
+        moisture_percent = 0;
+    } else if (moisture > MOIST_MAX) {
+        moisture_percent = 1000;
+    } else {
+	uint16_t range = MOIST_MAX - MOIST_MIN;
+        moisture_percent = (moisture - MOIST_MIN);
+	moisture_percent *= 1000;
+	moisture_percent /= range;
+    }
     temperature = getMF52Temp(data_adc[DATA_ADC_NUM-1]);
   }
 
   // if last measurement -> temperature
-  uint8_t next_channel = data_index % 2;
+  next_channel = data_index % 2;
   if (data_index == (DATA_ADC_NUM-1)) {
     next_channel = 2;
   }
 
+  // wait some time after each h, l moist measurement, ie start counter
+  if (data_index%2) {
+    // odd - no break
+    adcStart(data_channels[next_channel]);
+  } else {
+    // even - start measurement in some time
+    measureTimerStart();
+  }
+}
+
+/*
+ * ISR for blinking led
+ */
+ISR(TIM1_COMPA_vect) {
+  ledToggle();
+  if (blink_count == 0) {
+    ledOff();
+    blinkTimerStop();
+  }
+  blink_count--;
+}
+
+/*
+ * ISR for starting measurement
+ */
+ISR(TIM0_COMPA_vect) {
+  measureTimerStop();
   adcStart(data_channels[next_channel]);
-  //data_adc[0] = ADC;
-  //adcStart(CHANNEL_THERM);
 }
 
 // **************** watchdog ******************
@@ -171,34 +264,6 @@ void wdtOn() {
 
 #define reset() wdtOn(); while(1) {}
 
-
-// **************** timer for blinking ******************
-void timerSetup() {
-  TCCR1B |= 1<<CS11 | 1<<CS10; // divide by 64
-  OCR1A = 15625; // count 1sec = (1/4000000*64)*62500, 1/4sec -> 15625
-  TCCR1B |= 1<<WGM12; // put timer/counter1 in CTC mode (Clear Timer on Compare)
-  TIMSK1 |= 1<<OCIE1A; //enable timer compare interrupt
-}
-
-void timerStart() {
-  TIMSK1 |= 1<<OCIE1A; //enable timer compare interrupt
-}
-
-void timerStop() {
-  TIMSK1 &= 0<<OCIE1A; //disable timer compare interrupt
-}
-
-uint8_t count = 0;
-uint8_t lastCount = 0;
-ISR(TIM1_COMPA_vect) {
-  ledToggle();
-  if (count == 0) {
-      ledOff();
-      timerStop();
-  }
-  count--;
-}
-
 int main(void) {
   wdtOff();
   ledSetup();
@@ -207,20 +272,24 @@ int main(void) {
   DL("hello from ATtiny84.");
 
   // simple blink on startup
+  /*
   for (int i=0; i<6; i++) {
     _delay_ms(200);
     ledToggle();
   }
+  */
 
   cli();
   timerSetup();
+  blink_count=6;
+  blinkTimerStart();
+
   adcSetup();
   i2cSlaveInit(SLAVE_ADDR);
   sei();
 
   adcStart(data_channels[0]);
   //TODO wait until all channels updated once
-  //_delay_ms(100);
 
   // temperature and capacitance (moisture) is constantly updated by ISR
   while (1) {
@@ -236,8 +305,8 @@ int main(void) {
         }
       } else if (I2C_GET_MOIST == in) {
         // transmit moisture from raw data
-        i2cTransmitByte(moisture >> 8); // higher byte
-        i2cTransmitByte(moisture & 0x00ff); // lower byte
+        i2cTransmitByte(moisture_percent >> 8); // higher byte
+        i2cTransmitByte(moisture_percent & 0x00ff); // lower byte
 
       } else if (I2C_GET_TEMP == in) {
         // transmit temperature from existing raw data
@@ -247,14 +316,14 @@ int main(void) {
       } else if (I2C_SET_BLINK == in) {
         // read number of blinks
         ledOff();
-        timerStop();
-        lastCount = i2cReceiveByte();
-        count = 2*lastCount;
-        timerStart();
+        blinkTimerStop();
+        blink_last_count = i2cReceiveByte();
+        blink_count = 2*blink_last_count;
+        blinkTimerStart();
 
       } else if (I2C_GET_BLINK == in) {
         // transmit last number of blinks
-        i2cTransmitByte(lastCount);
+        i2cTransmitByte(blink_last_count);
       }
     }
   }
