@@ -41,6 +41,10 @@ out		1	0/1
 # Debugging
 - using http://www.justgeek.de/a-simple-simplex-uart-for-debugging-avrs/
 - connect uart to ATtiny: GND-GND, RXD-PA2
+- connect uart to additional USB on computer
+- connect spi programmer to USB on computer
+works also with CH340 uart
+
 ```
 make debug
 screen -L /dev/cu.usbserial-AH06TDUZ
