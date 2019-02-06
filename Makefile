@@ -18,6 +18,9 @@ fuseckout:
 fuse:
 	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xfc:m
 
+# Connect PA2 to RXD of UART. GND programmer to GND UART.
+# Connect UART to computer via USB
+# Connect SPI programmer to computer via additional USB
 debug:
 	@echo "quit with: ctrl-a; ctrl-$$ "
 	@sleep 1
