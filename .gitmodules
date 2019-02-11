@@ -4,3 +4,6 @@
 [submodule "lib/mf52"]
 	path = lib/mf52
 	url = git@github.com:2ni/mf52.git
+[submodule "debug/dwire-debug"]
+	path = debug/dwire-debug
+	url = git@github.com:dcwbrown/dwire-debug.git
