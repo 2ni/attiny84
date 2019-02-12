@@ -15,7 +15,7 @@ show_fuses:
 
 # No div8, clk to portb2, ceramic resonatr fast rising, 3-8MHz
 # to use for moisture sensor
-fuseckout:
+fuse_ckout:
 	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xbc:m
 
 # No div8, ceramic resonatr fast rising, 3-8MHz
@@ -24,7 +24,7 @@ fuse:
 	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xfc:m -U hfuse:w:0xdf:m -U efuse:w:0xff:m
 
 # same as fuse but with debugwire (dewen) enabled
-fusedwen:
+fuse_dwen:
 	avrdude -c usbasp -p t84 -P usb -U lfuse:w:0xfc:m -U hfuse:w:0x9f:m -U efuse:w:0xff:m
 
 # Connect PA2 to RXD of UART. GND programmer to GND UART.

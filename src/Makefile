@@ -3,13 +3,14 @@ DEVICE = attiny84
 CLOCK  = 4000000
 
 CC     = avr-gcc
-CFLAGS  = -g -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -Os -Wall -Werror -Wextra -I $(INC)/
+CFLAGS  = -ggdb -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -Os -Wall -Werror -Wextra -I $(INC)/
 OBJCOPY = avr-objcopy
 AVRDUDE = avrdude -c $(PROGRAMMER) -p $(DEVICE)
 
 # directories
 SRC = .
-INC = ../lib/uart
+# INC = ../lib/uart
+INC = .
 
 # device parameters
 PROGRAMMER = usbasp
@@ -56,3 +57,11 @@ fuses:
 # show fuses already set on micro-controller
 show_fuses:
 	@$(AVRDUDE) -nv 2>&1 |grep Fuses
+
+# temporarily switch to ISP mode (if dwen = 1)
+isp:
+	@(../debug/dwire-debug/dwdebug u0 1,qi 2>&1 >/dev/null && echo "temporarily switched to ISP mode. You may flash or update fuses now") || true
+
+# run cmd "reset" to connect to device
+dwdebug:
+	@../debug/dwire-debug/dwdebug
