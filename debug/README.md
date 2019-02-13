@@ -53,6 +53,8 @@ target remote :4444
 
 ```
 (gdb) break <file>:<line>      (eg verify_board.c:85)
+(gdb) del <breakpoint num>     (remove breakpoint num)
+(gdb) clear <file>:<line>      (remove breakpoint at file line)
 (gdb) run                      (use continue if run is not working, ctrl-c to stop)
 (gdb) bt                       (backtrace)
 (gdb) print <expr>
