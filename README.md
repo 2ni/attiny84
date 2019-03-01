@@ -50,6 +50,9 @@ make debug
 screen -L /dev/cu.usbserial-AH06TDUZ
 ```
 
+# Debugging with debugwire
+see debug/README
+
 This is not working:
 - download https://tinusaur.org/2015/03/07/the-owowod-library/ to lib
 - only debugging.h, owowod.*, serout.h is needed

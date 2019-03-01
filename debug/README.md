@@ -1,5 +1,8 @@
 Following https://github.com/dcwbrown/dwire-debug/blob/master/Manual.md#running-the-program
 
+### Connection
+connect GND, 5V. txd (black point on cable), rxd to RST on attiny
+
 ### Find device
 ```
 ls -al /dev/tty.*
