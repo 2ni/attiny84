@@ -1,4 +1,4 @@
-.PHONY: compile upload check fuse
+.PHONY: compile upload check fuse debug
 
 compile:
 	pio run

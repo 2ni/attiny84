@@ -137,7 +137,7 @@ int main(void) {
     while (1) {
         value = measure();
         uint16_t valueCalibrated = value - calibrate;
-        // if (value > 0xfff0) value = 0x00; // if negative set it 0
+        if (valueCalibrated > 0xfff0) valueCalibrated = 0x00; // if negative set it 0
         DF("value: %u (uncalibrated: %u)", valueCalibrated, value);
 
         if (valueCalibrated > 50) {
