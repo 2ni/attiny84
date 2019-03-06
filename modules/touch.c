@@ -35,13 +35,19 @@
 #define PORT	PORTB
 #define LED	PB2
 
-// DDRA, PORTA
-// SCL PA4 (also SCK)
-// SDA PA6 (also MOSI)
-// SCL, SDA do not work, as they have low pullups!
 // using INT_RFM PA1
 #define TOUCH PA1
 #define TOUCHINT PCINT1
+
+#if defined (__AVR_ATtiny84__)
+    #define TIMER_vect TIM1_COMPA_vect
+    #define INT_SETUP GIMSK
+    #define INT_CLEAR GIFR
+#elif defined (__AVR_ATtiny88__)
+    #define TIMER_vect TIMER1_COMPA_vect
+    #define INT_SETUP PCICR
+    #define INT_CLEAR PCIFR
+#endif
 
 inline static void ledSetup(){
   DDR |= _BV(LED);
@@ -73,7 +79,7 @@ ISR(PCINT0_vect) {
 }
 
 //This is an interrupt that automatically gets called if the pin takes too long to rise.
-ISR(TIM1_COMPA_vect) {
+ISR(TIMER_vect) {
 	tr = 0xfff0;
 }
 
@@ -86,7 +92,7 @@ uint16_t measure() {
     // wait a short time to ensure discharge
     _delay_ms(10);
 
-    GIFR = (1<<PCIF0); // clear any pending interrupt flag
+    INT_CLEAR = (1<<PCIF0); // clear any pending interrupt flag
     PCMSK0 |= _BV(TOUCHINT); // set pin change interrupt
 
     DDRA &= ~_BV(TOUCH);  // set as input -> capacity is charged via resistor
@@ -103,28 +109,27 @@ uint16_t measure() {
 
 
 int main(void) {
-	DINIT();
-	uint16_t value;
-	unsigned short calibrate = 0;  //Initial "zero" value for touch sensor
+    DINIT();
+    uint16_t value;
+    unsigned short calibrate = 0;  //Initial "zero" value for touch sensor
 
-	//Setup timer
+    //Setup timer
 
-	TCCR1B = _BV(CS10);       //Use prescalar 2. CS10 = /1, CS11 = /8, ...
-	TIMSK1 |= _BV(OCIE1A);  //Enable overflow compare A (to detect if we're taking too long)
-	OCR1A = 0xfff0;            //Set overflow A to be 0xfff0 cycles
+    TCCR1B = _BV(CS10);       //Use prescalar 2. CS10 = /1, CS11 = /8, ...
+    TIMSK1 |= _BV(OCIE1A);  //Enable overflow compare A (to detect if we're taking too long)
+    OCR1A = 0xfff0;            //Set overflow A to be 0xfff0 cycles
 
-	sleep_enable();          //Allow the CPU to sleep.
+    sleep_enable();          //Allow the CPU to sleep.
 
-	GIMSK |= _BV(PCIE0);      //Enable Pin change interrupts.
-
+    INT_SETUP |= _BV(PCIE0);      //Enable Pin change interrupts.
 
     TIFR1 |= _BV(OCF1A); // interrupt flag register, compares to OCR1A
 
-	PORTA &= ~_BV(TOUCH); // set port low as default
+    PORTA &= ~_BV(TOUCH); // set port low as default
 
-	tr = 0x0000;
+    tr = 0x0000;
 
-	DL("Hello there");
+    DL("Hello there");
     count = 0;
     sei();
 
